@@ -16,6 +16,7 @@ from ragdesk.core.exceptions import register_exception_handlers
 from ragdesk.core.logging import RequestContextMiddleware, configure_logging
 from ragdesk.core.queue import ArqQueue, get_queue
 from ragdesk.core.redis import close_redis, get_redis
+from ragdesk.sources.router import router as sources_router
 
 
 @asynccontextmanager
@@ -57,6 +58,7 @@ def create_app() -> FastAPI:
     api = APIRouter(prefix=settings.api_prefix)
     api.include_router(auth_router)
     api.include_router(bots_router)
+    api.include_router(sources_router)
     app.include_router(api)
 
     @app.get("/health/live", tags=["health"])

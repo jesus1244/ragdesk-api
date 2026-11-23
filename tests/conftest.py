@@ -45,6 +45,26 @@ def pytest_unconfigure(config: pytest.Config) -> None:
         _container.stop()
 
 
+class InlineQueue:
+    """Runs jobs immediately, in-process, and records every call for assertions."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, tuple[Any, ...], str | None]] = []
+        self.retries: list[str] = []
+
+    async def enqueue(self, function: str, *args: Any, job_id: str | None = None) -> None:
+        from arq import Retry
+
+        from ragdesk.ingestion.tasks import ingest_source_job
+
+        self.calls.append((function, args, job_id))
+        jobs = {"ingest_source": ingest_source_job}
+        try:
+            await jobs[function]({"job_try": 1}, *args)
+        except Retry:
+            self.retries.append(function)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _migrate_database() -> Iterator[None]:
     from alembic import command
@@ -61,15 +81,26 @@ async def _clean_state() -> AsyncIterator[None]:
     import fakeredis
     from sqlalchemy import text
 
-    from ragdesk.core import redis
+    from ragdesk.core import embeddings, queue, redis
     from ragdesk.core.database import engine
 
     redis.set_redis(fakeredis.FakeAsyncRedis(decode_responses=True))
+    queue.set_queue(InlineQueue())
+    embeddings.set_embedder(embeddings.FakeEmbedder())
     yield
     async with engine.begin() as conn:
         await conn.execute(
             text("TRUNCATE auth_user, auth_refresh_token, bot, source, chunk CASCADE")
         )
+
+
+@pytest.fixture
+def inline_queue() -> InlineQueue:
+    from ragdesk.core.queue import get_queue
+
+    q = get_queue()
+    assert isinstance(q, InlineQueue)
+    return q
 
 
 @pytest.fixture
