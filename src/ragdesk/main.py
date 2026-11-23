@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+import ragdesk.models  # noqa: F401  - registers all ORM models
+from ragdesk.auth.router import router as auth_router
 from ragdesk.core.config import get_settings
 from ragdesk.core.database import engine
 from ragdesk.core.exceptions import register_exception_handlers
@@ -52,6 +54,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     api = APIRouter(prefix=settings.api_prefix)
+    api.include_router(auth_router)
     app.include_router(api)
 
     @app.get("/health/live", tags=["health"])
