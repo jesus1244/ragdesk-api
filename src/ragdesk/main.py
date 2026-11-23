@@ -9,6 +9,7 @@ from sqlalchemy import text
 
 import ragdesk.models  # noqa: F401  - registers all ORM models
 from ragdesk.auth.router import router as auth_router
+from ragdesk.bots.router import router as bots_router
 from ragdesk.core.config import get_settings
 from ragdesk.core.database import engine
 from ragdesk.core.exceptions import register_exception_handlers
@@ -55,6 +56,7 @@ def create_app() -> FastAPI:
 
     api = APIRouter(prefix=settings.api_prefix)
     api.include_router(auth_router)
+    api.include_router(bots_router)
     app.include_router(api)
 
     @app.get("/health/live", tags=["health"])

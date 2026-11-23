@@ -67,7 +67,9 @@ async def _clean_state() -> AsyncIterator[None]:
     redis.set_redis(fakeredis.FakeAsyncRedis(decode_responses=True))
     yield
     async with engine.begin() as conn:
-        await conn.execute(text("TRUNCATE auth_user, auth_refresh_token CASCADE"))
+        await conn.execute(
+            text("TRUNCATE auth_user, auth_refresh_token, bot, source, chunk CASCADE")
+        )
 
 
 @pytest.fixture
