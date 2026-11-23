@@ -163,10 +163,10 @@ class FakeChatModel:
         instructions: str,
     ) -> AsyncIterator[ChatEvent]:
         if not passages:
-            yield TextDelta("I could not find that in the documentation.")
+            yield TextDelta("...")
             return
         snippet = passages[0].text[:200]
-        for word in f"According to the documentation: {snippet}".split(" "):
+        for word in snippet.split(" "):
             yield TextDelta(word + " ")
         yield CitationFound(0, passages[0].text)
 

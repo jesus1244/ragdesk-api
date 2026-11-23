@@ -33,6 +33,8 @@ class CitationRead(CustomModel):
 class WidgetConfig(CustomModel):
     name: str
     welcome_message: str
+    language: str
+    suggested_questions: list[str]
 
 
 class MessageRead(CustomModel):

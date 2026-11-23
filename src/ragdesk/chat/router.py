@@ -32,7 +32,12 @@ async def chat_context(
 @router.get("/bots/{public_key}", response_model=WidgetConfig, responses=ERRORS)
 async def widget_config(public_key: str, request: Request, session: SessionDep) -> WidgetConfig:
     bot = await service.get_public_bot(session, public_key, request.headers.get("origin"))
-    return WidgetConfig(name=bot.name, welcome_message=bot.welcome_message)
+    return WidgetConfig(
+        name=bot.name,
+        welcome_message=bot.welcome_message,
+        language=bot.language,
+        suggested_questions=bot.suggested_questions,
+    )
 
 
 @router.post(

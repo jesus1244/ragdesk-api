@@ -29,6 +29,7 @@ from ragdesk.chat.llm import (
     Turn,
     get_chat_model,
 )
+from ragdesk.chat.messages import messages_for
 from ragdesk.chat.models import Conversation, Message, MessageRole
 from ragdesk.chat.schemas import ChatRequest, CitationRead
 from ragdesk.core.config import get_settings
@@ -39,9 +40,6 @@ from ragdesk.retrieval.service import Hit, search
 
 log = structlog.get_logger("chat")
 
-NO_ANSWER = "I could not find that in the documentation."
-REFUSED = "Sorry, I cannot help with that request."
-FAILED = "Sorry, something went wrong. Please try again in a moment."
 HISTORY_MESSAGES = 6
 SNIPPET_CHARS = 240
 
@@ -52,6 +50,8 @@ class ChatContext:
     conversation_id: UUID
     question: str
     instructions: str
+    language: str = "en"
+    fallback_message: str = ""
     history: list[Turn] = field(default_factory=list)
 
 
@@ -115,6 +115,8 @@ async def open_chat(
         conversation_id=conversation.id,
         question=data.question,
         instructions=bot.instructions,
+        language=bot.language,
+        fallback_message=bot.fallback_message,
         history=history,
     )
 
@@ -137,6 +139,7 @@ async def _load_history(session: AsyncSession, conversation_id: UUID) -> list[Tu
 
 async def run_chat(ctx: ChatContext) -> AsyncIterator[ServerSentEvent]:
     settings = get_settings()
+    texts = messages_for(ctx.language)
     yield _event("meta", {"conversation_id": str(ctx.conversation_id)})
 
     try:
@@ -152,7 +155,7 @@ async def run_chat(ctx: ChatContext) -> AsyncIterator[ServerSentEvent]:
             )
     except EmbeddingError:
         log.exception("chat.retrieval_failed", bot_id=str(ctx.bot_id))
-        yield _event("error", {"message": FAILED})
+        yield _event("error", {"message": texts.failed})
         return
 
     text_parts: list[str] = []
@@ -160,8 +163,9 @@ async def run_chat(ctx: ChatContext) -> AsyncIterator[ServerSentEvent]:
     refused = False
 
     if not hits:
-        text_parts.append(NO_ANSWER)
-        yield _event("delta", {"text": NO_ANSWER})
+        no_answer = ctx.fallback_message.strip() or texts.no_answer
+        text_parts.append(no_answer)
+        yield _event("delta", {"text": no_answer})
     else:
         passages = [Passage(str(h.source_id), h.title, h.content) for h in hits]
         try:
@@ -180,13 +184,13 @@ async def run_chat(ctx: ChatContext) -> AsyncIterator[ServerSentEvent]:
                     refused = True
         except ChatModelError:
             log.exception("chat.model_failed", bot_id=str(ctx.bot_id))
-            yield _event("error", {"message": FAILED})
+            yield _event("error", {"message": texts.failed})
             return
 
     if refused:
-        text_parts = [REFUSED]
+        text_parts = [texts.refused]
         citations.clear()
-        yield _event("delta", {"text": REFUSED})
+        yield _event("delta", {"text": texts.refused})
 
     answer = "".join(text_parts).strip()
     answered = bool(citations)

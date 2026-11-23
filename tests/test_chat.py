@@ -315,13 +315,26 @@ async def test_invalid_questions_are_rejected(
     assert (await _ask(client, key, "x" * 1001)).status_code == 422
 
 
-async def test_widget_config_exposes_only_name_and_welcome_message(
+async def test_widget_config_exposes_only_what_the_widget_needs(
     client: AsyncClient, auth_headers: dict[str, str]
 ) -> None:
-    _, key = await _bot(client, auth_headers, instructions="secret guidance")
+    _, key = await _bot(
+        client,
+        auth_headers,
+        instructions="secret guidance",
+        language="es",
+        suggested_questions=["¿Cuánto tarda el envío?"],
+    )
     response = await client.get(f"/public/bots/{key}")
     assert response.status_code == 200
-    assert set(response.json()) == {"name", "welcome_message"}
+    assert set(response.json()) == {
+        "name",
+        "welcome_message",
+        "language",
+        "suggested_questions",
+    }
+    assert response.json()["language"] == "es"
+    assert response.json()["suggested_questions"] == ["¿Cuánto tarda el envío?"]
 
 
 @pytest.mark.parametrize("path", ["/public/chat/bot_x", "/public/bots/bot_x"])
@@ -345,3 +358,40 @@ async def test_cors_headers_are_present_on_public_responses_and_absent_on_admin_
     assert public.headers["access-control-allow-origin"] == "https://a.example.com"
     admin = await client.get("/bots", headers={**auth_headers, "Origin": "https://a.example.com"})
     assert "access-control-allow-origin" not in admin.headers
+
+
+async def _no_match_text(client: AsyncClient, key: str) -> str:
+    events = parse_sse(await _ask(client, key, "quantum chromodynamics lagrangian"))
+    return "".join(d["text"] for n, d in events if n == "delta")
+
+
+async def test_the_no_match_message_follows_the_assistant_language(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    _, english = await _bot(client, auth_headers)
+    _, spanish = await _bot(client, auth_headers, language="es")
+    assert "could not find" in await _no_match_text(client, english)
+    assert "No encontré" in await _no_match_text(client, spanish)
+
+
+async def test_the_owner_fallback_message_replaces_the_default(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    _, key = await _bot(client, auth_headers, fallback_message="Email help@shop.example")
+    assert await _no_match_text(client, key) == "Email help@shop.example"
+    assert (await _messages())[-1].answered is False
+
+
+async def test_a_spanish_assistant_reports_failures_and_refusals_in_spanish(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    set_chat_model(RecordingModel([Refused()]))
+    try:
+        _, key = await _bot(client, auth_headers, language="es")
+        await _ask(client, key, "refund within fourteen days")
+        assert (await _messages())[-1].content.startswith("Lo siento")
+        set_chat_model(RecordingModel(ChatModelError("boom")))
+        failed = parse_sse(await _ask(client, key, "refund within fourteen days"))
+    finally:
+        set_chat_model(None)
+    assert failed[-1][1]["message"].startswith("Lo siento")
