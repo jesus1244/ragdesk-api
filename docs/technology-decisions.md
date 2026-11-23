@@ -102,7 +102,7 @@ restart.
 
 ## Chunking
 
-- Markdown and web pages are split by headings; each chunk keeps its heading path (`Guide › Install`) as the title.
+- Markdown and web pages are split by headings; each chunk keeps its heading path (`Guide > Install`) as the title.
 - PDFs are split per page; the title is `Page N`, so a citation tells the reader where to look.
 - Paragraphs are packed up to ~1,500 characters; longer paragraphs are split on sentence boundaries.
 
