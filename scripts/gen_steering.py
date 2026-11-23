@@ -165,9 +165,7 @@ def main() -> None:
 
         # Claude Code: path-scoped rules; a file without `paths` is always loaded.
         claude_head = (
-            ""
-            if always
-            else "---\npaths:\n" + "".join(f'  - "{g}"\n' for g in globs) + "---\n\n"
+            "" if always else "---\npaths:\n" + "".join(f'  - "{g}"\n' for g in globs) + "---\n\n"
         )
         write(ROOT / ".claude" / "rules" / f"{name}.md", claude_head + body)
 
