@@ -10,7 +10,9 @@ from sqlalchemy import text
 import ragdesk.models  # noqa: F401  - registers all ORM models
 from ragdesk.auth.router import router as auth_router
 from ragdesk.bots.router import router as bots_router
+from ragdesk.chat.router import router as chat_router
 from ragdesk.core.config import get_settings
+from ragdesk.core.cors import PublicCorsMiddleware
 from ragdesk.core.database import engine
 from ragdesk.core.exceptions import register_exception_handlers
 from ragdesk.core.logging import RequestContextMiddleware, configure_logging
@@ -52,6 +54,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
         expose_headers=["X-Request-ID"],
     )
+    app.add_middleware(PublicCorsMiddleware, path_prefix=f"{settings.api_prefix}/public/")
     app.add_middleware(RequestContextMiddleware)
     register_exception_handlers(app)
 
@@ -59,6 +62,7 @@ def create_app() -> FastAPI:
     api.include_router(auth_router)
     api.include_router(bots_router)
     api.include_router(sources_router)
+    api.include_router(chat_router)
     app.include_router(api)
 
     @app.get("/health/live", tags=["health"])
