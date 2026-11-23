@@ -94,6 +94,10 @@ curl -N -X POST http://localhost:8000/api/v1/public/chat/<widget-key> \
   -d '{"question": "How long do I have to return an item?"}'
 ```
 
+Two faces, two addresses (details in [ragdesk-web](https://github.com/jesus1244/ragdesk-web#try-it-end-to-end-two-different-places)):
+the owner's panel at `http://localhost:4200` and the visitor's chat at
+`http://localhost:4200/widget-demo.html?bot=<widget-key>`. The seed prints the demo login and the key.
+
 To use the real providers set `EMBEDDER=gemini`, `GEMINI_API_KEY`, `CHAT_MODEL_PROVIDER=claude` and
 `ANTHROPIC_API_KEY` in `.env`. Or run everything in containers: `docker compose --profile app up`.
 
