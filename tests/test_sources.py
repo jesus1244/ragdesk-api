@@ -13,7 +13,10 @@ from ragdesk.sources.models import Chunk
 from tests.conftest import InlineQueue, register_and_login
 from tests.pdfs import make_pdf
 
-GUIDE = b"# Guide\n\n## Refunds\n\nRefunds are issued within 14 days.\n\n## Shipping\n\nShipping takes 3 days.\n"
+GUIDE = (
+    b"# Guide\n\n## Refunds\n\nRefunds are issued within 14 days.\n\n"
+    b"## Shipping\n\nShipping takes 3 days.\n"
+)
 
 
 async def _bot(client: AsyncClient, headers: dict[str, str]) -> str:
