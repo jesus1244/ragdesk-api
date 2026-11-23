@@ -102,3 +102,73 @@ async def test_deleted_bot_disappears(client: AsyncClient, auth_headers: dict[st
     assert (await client.delete(f"/bots/{bot['id']}", headers=auth_headers)).status_code == 204
     assert (await client.get(f"/bots/{bot['id']}", headers=auth_headers)).status_code == 404
     assert (await client.get("/bots", headers=auth_headers)).json()["total"] == 0
+
+
+async def test_new_bots_default_to_english_with_no_custom_fallback_or_suggestions(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    bot = await _create(client, auth_headers)
+    assert bot["language"] == "en"
+    assert bot["fallback_message"] == ""
+    assert bot["suggested_questions"] == []
+
+
+async def test_language_fallback_and_suggested_questions_can_be_set_and_updated(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    created = await client.post(
+        "/bots",
+        json={
+            "name": "Tienda",
+            "language": "es",
+            "fallback_message": "Escríbenos a ayuda@tienda.com",
+            "suggested_questions": ["¿Cuánto tarda el envío?", "  ¿Cómo pido un reembolso?  "],
+        },
+        headers=auth_headers,
+    )
+    assert created.status_code == 201, created.text
+    bot = created.json()
+    assert bot["language"] == "es"
+    assert bot["suggested_questions"] == ["¿Cuánto tarda el envío?", "¿Cómo pido un reembolso?"]
+
+    updated = await client.patch(
+        f"/bots/{bot['id']}",
+        json={"fallback_message": "", "suggested_questions": []},
+        headers=auth_headers,
+    )
+    assert updated.json()["fallback_message"] == ""
+    assert updated.json()["suggested_questions"] == []
+    assert updated.json()["language"] == "es"
+
+
+async def test_suggested_questions_are_cleaned_and_limited(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    cleaned = await client.post(
+        "/bots",
+        json={"name": "Docs bot", "suggested_questions": ["Hi?", "", "  ", "Hi?", "Bye?"]},
+        headers=auth_headers,
+    )
+    assert cleaned.json()["suggested_questions"] == ["Hi?", "Bye?"]
+
+    too_many = await client.post(
+        "/bots",
+        json={"name": "Docs bot", "suggested_questions": [f"Question {i}?" for i in range(5)]},
+        headers=auth_headers,
+    )
+    assert too_many.status_code == 422
+    too_long = await client.post(
+        "/bots",
+        json={"name": "Docs bot", "suggested_questions": ["x" * 121]},
+        headers=auth_headers,
+    )
+    assert too_long.status_code == 422
+
+
+async def test_only_supported_languages_are_accepted(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    response = await client.post(
+        "/bots", json={"name": "Docs bot", "language": "fr"}, headers=auth_headers
+    )
+    assert response.status_code == 422

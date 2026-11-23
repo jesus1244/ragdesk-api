@@ -27,6 +27,11 @@ class Bot(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         String(300), default="Hi! Ask me anything about our documentation."
     )
     instructions: Mapped[str] = mapped_column(Text, default="")
+    language: Mapped[str] = mapped_column(String(5), default="en", server_default="en")
+    fallback_message: Mapped[str] = mapped_column(String(300), default="", server_default="")
+    suggested_questions: Mapped[list[str]] = mapped_column(
+        ARRAY(String(120)), default=list, server_default="{}"
+    )
     allowed_origins: Mapped[list[str]] = mapped_column(ARRAY(String(255)), default=list)
     is_demo: Mapped[bool] = mapped_column(default=False)
     deleted_at: Mapped[datetime | None]
