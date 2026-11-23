@@ -1,0 +1,107 @@
+[project]
+name = "ragdesk"
+version = "0.1.0"
+description = "Chat with your own documents: hybrid search with pgvector, cited answers from Claude, streamed over SSE."
+readme = "README.md"
+authors = [
+    { name = "jesus1244", email = "jesus.1344@hotmail.com" }
+]
+requires-python = ">=3.13"
+license = "MIT"
+dependencies = [
+    "alembic>=1.20.1",
+    "anthropic>=2.12.0",
+    "arq>=0.28.0",
+    "asyncpg>=0.32.0",
+    "fastapi[standard]>=0.165.0",
+    "google-genai>=3.6.1",
+    "httpx>=0.28.1",
+    "pgvector>=0.5.1",
+    "pwdlib[argon2]>=0.4.2",
+    "pydantic-settings>=2.16.3",
+    "pyjwt>=2.15.1",
+    "pypdf>=7.1.1",
+    "redis>=5.3.1",
+    "sqlalchemy[asyncio]>=2.1.9",
+    "structlog>=26.1.0",
+    "trafilatura>=2.3.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "asgi-lifespan>=2.1.0",
+    "fakeredis>=2.41.0",
+    "mypy>=2.4.1",
+    "pre-commit>=4.7.0",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
+    "pytest-cov>=7.1.0",
+    "respx>=0.23.1",
+    "ruff>=0.17.6",
+    "testcontainers[postgres]>=4.15.0",
+]
+
+[project.scripts]
+ragdesk-seed-demo = "ragdesk.demo.seed:main"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F",   # pycodestyle + pyflakes
+    "I",             # isort
+    "B",             # bugbear
+    "UP",            # pyupgrade
+    "SIM",           # simplify
+    "N",             # naming
+    "S",             # bandit (security)
+    "ASYNC",         # async pitfalls
+    "RUF",
+    "PL",            # pylint subset
+    "PT",            # pytest style
+    "TID",           # tidy imports
+]
+ignore = ["PLR0913", "PLR0917", "PLR2004", "B008", "RUF012"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "S107", "PLR2004", "ARG001", "PLC0415"]
+"migrations/**" = ["N999", "E501"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.File", "fastapi.Form"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"
+packages = ["ragdesk"]
+
+[[tool.mypy.overrides]]
+module = ["arq.*", "trafilatura.*", "testcontainers.*", "fakeredis.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+filterwarnings = ["ignore::DeprecationWarning:testcontainers.*"]
+
+[tool.coverage.run]
+source = ["src/ragdesk"]
+concurrency = ["greenlet", "thread"]
+omit = ["src/ragdesk/worker.py"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true
