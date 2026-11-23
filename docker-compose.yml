@@ -1,0 +1,60 @@
+# Local stack. Infrastructure only by default; the API and worker run on the host with `uv run`.
+#   docker compose up -d postgres redis                # develop on the host
+#   docker compose --profile app up --build            # run everything in containers
+# API docs: http://localhost:8000/docs
+
+x-app: &app
+  build: .
+  profiles: [app]
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    DATABASE_URL: postgresql+asyncpg://ragdesk:ragdesk@postgres:5432/ragdesk
+    REDIS_URL: redis://redis:6379/0
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+  restart: unless-stopped
+
+services:
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
+  api:
+    <<: *app
+    ports: ["8000:8000"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  worker:
+    <<: *app
+    command: ["arq", "ragdesk.worker.WorkerSettings"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  postgres:
+    image: pgvector/pgvector:pg18-trixie
+    environment:
+      POSTGRES_USER: ragdesk
+      POSTGRES_PASSWORD: ragdesk
+      POSTGRES_DB: ragdesk
+    ports: ["5435:5432"]
+    volumes: [postgres-data:/var/lib/postgresql]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ragdesk"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6381:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
