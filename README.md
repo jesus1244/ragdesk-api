@@ -94,6 +94,10 @@ curl -N -X POST http://localhost:8000/api/v1/public/chat/<widget-key> \
   -d '{"question": "How long do I have to return an item?"}'
 ```
 
+The seed creates an English and a Spanish demo assistant (separate widget keys). An assistant has a
+`language`, a `fallback_message` and up to four `suggested_questions`; the public widget config
+returns the language and the suggestions.
+
 Two faces, two addresses (details in [ragdesk-web](https://github.com/jesus1244/ragdesk-web#try-it-end-to-end-two-different-places)):
 the owner's panel at `http://localhost:4200` and the visitor's chat at
 `http://localhost:4200/widget-demo.html?bot=<widget-key>`. The seed prints the demo login and the key.
