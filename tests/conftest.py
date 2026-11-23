@@ -88,10 +88,9 @@ async def _clean_state() -> AsyncIterator[None]:
     queue.set_queue(InlineQueue())
     embeddings.set_embedder(embeddings.FakeEmbedder())
     yield
+    tables = "auth_user, auth_refresh_token, bot, source, chunk, conversation, message"
     async with engine.begin() as conn:
-        await conn.execute(
-            text("TRUNCATE auth_user, auth_refresh_token, bot, source, chunk CASCADE")
-        )
+        await conn.execute(text(f"TRUNCATE {tables} CASCADE"))
 
 
 @pytest.fixture
