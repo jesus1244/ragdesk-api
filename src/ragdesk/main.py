@@ -18,6 +18,7 @@ from ragdesk.core.exceptions import register_exception_handlers
 from ragdesk.core.logging import RequestContextMiddleware, configure_logging
 from ragdesk.core.queue import ArqQueue, get_queue
 from ragdesk.core.redis import close_redis, get_redis
+from ragdesk.insights.router import router as insights_router
 from ragdesk.sources.router import router as sources_router
 
 
@@ -63,6 +64,7 @@ def create_app() -> FastAPI:
     api.include_router(bots_router)
     api.include_router(sources_router)
     api.include_router(chat_router)
+    api.include_router(insights_router)
     app.include_router(api)
 
     @app.get("/health/live", tags=["health"])
