@@ -43,6 +43,12 @@ class ForbiddenError(AppError):
     message = "You do not have access to this resource"
 
 
+class UnprocessableError(AppError):
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
+    code = "unprocessable"
+    message = "The request cannot be processed"
+
+
 class RateLimitedError(AppError):
     status_code = status.HTTP_429_TOO_MANY_REQUESTS
     code = "rate_limited"

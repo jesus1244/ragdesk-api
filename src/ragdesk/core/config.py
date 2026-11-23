@@ -49,6 +49,8 @@ class Settings(BaseSettings):
 
     # --- ingestion
     max_upload_mb: int = 20
+    max_sources_per_bot: int = 50
+    max_text_chars: int = 500_000
     chunk_target_chars: int = 1500
     url_fetch_timeout_seconds: float = 15.0
     url_fetch_max_mb: int = 5
