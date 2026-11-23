@@ -10,6 +10,7 @@ import asyncio
 import os
 import secrets
 import string
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,11 +19,11 @@ from ragdesk.auth.models import User
 from ragdesk.auth.schemas import RegisterRequest
 from ragdesk.auth.service import register_user
 from ragdesk.bots.models import Bot
-from ragdesk.bots.schemas import BotCreate
-from ragdesk.bots.service import create_bot
+from ragdesk.bots.schemas import BotCreate, BotUpdate
+from ragdesk.bots.service import create_bot, update_bot
 from ragdesk.core.database import SessionFactory, engine
 from ragdesk.core.embeddings import Embedder, get_embedder
-from ragdesk.demo.content import DEMO_BOT_NAME, DEMO_DOCUMENTS, DEMO_WELCOME
+from ragdesk.demo.content import DEMO_ASSISTANTS, DemoAssistant
 from ragdesk.ingestion.service import ingest_source
 from ragdesk.sources.models import Source, SourceKind
 
@@ -32,28 +33,27 @@ def _random_password() -> str:
     return "Aa1" + "".join(secrets.choice(alphabet) for _ in range(16))
 
 
-async def seed_demo(
-    session: AsyncSession, *, embedder: Embedder, email: str, password: str
-) -> tuple[Bot, bool]:
-    """Returns the demo bot and whether the owner account was created by this call."""
-    created = False
-    user = await session.scalar(select(User).where(User.email == email))
-    if user is None:
-        user = await register_user(
-            session, RegisterRequest(email=email, full_name="Demo Owner", password=password)
-        )
-        created = True
-
-    bot = await session.scalar(select(Bot).where(Bot.owner_id == user.id, Bot.is_demo.is_(True)))
+async def _ensure_assistant(
+    session: AsyncSession, owner_id: UUID, demo: DemoAssistant, embedder: Embedder
+) -> Bot:
+    settings = {
+        "welcome_message": demo.welcome,
+        "language": demo.language,
+        "fallback_message": demo.fallback,
+        "suggested_questions": demo.suggested_questions,
+    }
+    bot = await session.scalar(
+        select(Bot).where(Bot.owner_id == owner_id, Bot.is_demo.is_(True), Bot.name == demo.name)
+    )
     if bot is None:
-        bot = await create_bot(
-            session, user.id, BotCreate(name=DEMO_BOT_NAME, welcome_message=DEMO_WELCOME)
-        )
+        bot = await create_bot(session, owner_id, BotCreate(name=demo.name, **settings))
         bot.is_demo = True
         await session.commit()
+    else:
+        bot = await update_bot(session, bot, BotUpdate(**settings))
 
     existing = set(await session.scalars(select(Source.name).where(Source.bot_id == bot.id)))
-    for name, text in DEMO_DOCUMENTS.items():
+    for name, text in demo.documents.items():
         if name in existing:
             continue
         source = Source(
@@ -66,7 +66,22 @@ async def seed_demo(
         session.add(source)
         await session.commit()
         await ingest_source(session, source.id, embedder=embedder)
-    return bot, created
+    return bot
+
+
+async def seed_demo(
+    session: AsyncSession, *, embedder: Embedder, email: str, password: str
+) -> tuple[list[Bot], bool]:
+    """Returns the demo assistants (English, Spanish) and whether the owner was created now."""
+    created = False
+    user = await session.scalar(select(User).where(User.email == email))
+    if user is None:
+        user = await register_user(
+            session, RegisterRequest(email=email, full_name="Demo Owner", password=password)
+        )
+        created = True
+    bots = [await _ensure_assistant(session, user.id, d, embedder) for d in DEMO_ASSISTANTS]
+    return bots, created
 
 
 async def _run() -> None:
@@ -74,10 +89,12 @@ async def _run() -> None:
     password = os.environ.get("DEMO_PASSWORD") or _random_password()
     try:
         async with SessionFactory() as session:
-            bot, created = await seed_demo(
+            bots, created = await seed_demo(
                 session, embedder=get_embedder(), email=email, password=password
             )
-            print(f"Demo assistant ready. Widget key: {bot.public_key}")
+            for bot in bots:
+                print(f"Demo assistant ready: {bot.name} ({bot.language})")
+                print(f"  Widget key: {bot.public_key}")
             if created:
                 print(f"Demo owner created: {email} / {password}  (shown once)")
             else:
